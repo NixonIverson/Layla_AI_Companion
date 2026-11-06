@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mika</title>
+<style>
+/* ───────── Tokens ───────── */
+:root {
+  --bg: #15131f;
+  --bg-2: #1a1726;
+  --panel: #1d1a2b;
+  --her: #2b2640;
+  --me: #eadfcf;
+  --me-ink: #1c1826;
+  --ink: #e9e4f5;
+  --mute: #8e88a6;
+  --accent: #f2a0b4;
+  --accent-2: #c9a0f2;
+  --accent-soft: rgba(242, 160, 180, .16);
+  --line: #2d2940;
+  --radius: 16px;
+  --ease: cubic-bezier(.2, .8, .2, 1);
+  color-scheme: dark;
+}
+
+/* ───────── Base ───────── */
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.45 "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+svg {
+  width: 16px; height: 16px;
+  fill: none; stroke: currentColor;
+  stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
+}
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ───────── Layout ───────── */
+#app { display: grid; grid-template-columns: 290px 1fr; height: 100%; }
+main { min-width: 0; position: relative; }
+#chat { display: flex; flex-direction: column; height: 100%; background: var(--bg); }
+
+#away {
+  display: none;
+  position: absolute; inset: 0;
+  align-items: center; justify-content: center;
+  padding: 30px;
+  text-align: center; color: var(--mute);
+}
+.floating #away { display: flex; }
+
+/* ───────── Settings sidebar ───────── */
+aside {
+  padding: 20px;
+  border-right: 1px solid var(--line);
+  background: var(--bg-2);
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+aside h2 { margin: 0 0 16px; font-size: 16px; letter-spacing: .2px; }
+label { display: block; margin: 0 0 12px; color: var(--mute); font-size: 13px; }
+label.row { display: flex; gap: 8px; align-items: center; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+input[type=text], input[type=number], textarea, select {
+  width: 100%;
+  margin-top: 4px; padding: 7px 9px;
+  background: var(--panel); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 8px;
+  font: inherit;
+  transition: border-color .15s;
+}
+input[type=text]:hover, input[type=number]:hover, textarea:hover, select:hover { border-color: #3d3857; }
+input[type=checkbox] { accent-color: var(--accent); }
+textarea { height: 150px; resize: vertical; }
+
+button {
+  font: inherit; color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--line); border-radius: 8px;
+  padding: 6px 11px; cursor: pointer;
+  transition: border-color .15s, background .15s, transform .1s;
+}
+button:hover { border-color: var(--accent); }
+button:active { transform: scale(.97); }
+button.on { background: var(--accent); color: var(--me-ink); border-color: var(--accent); }
+
+/* ───────── Header ───────── */
+header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+}
+header .who { flex: 1; min-width: 0; line-height: 1.25; }
+header b { display: block; font-size: 16px; }
+header small { color: var(--mute); }
+header button { display: flex; align-items: center; gap: 6px; padding: 6px 9px; }
+
+.av {
+  flex: none;
+  width: 36px; height: 36px;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: var(--me-ink); font-weight: 700;
+  transition: box-shadow .3s;
+}
+.av.busy { box-shadow: 0 0 0 4px rgba(242, 160, 180, .3); }
+
+.dot {
+  display: inline-block;
+  width: 8px; height: 8px; margin-right: 5px;
+  border-radius: 50%; background: var(--accent);
+}
+.dot.busy { animation: pulse 1s infinite; }
+
+/* ───────── Messages ───────── */
+#msgs {
+  flex: 1; overflow: auto;
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 16px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+.b {
+  max-width: 80%;
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  white-space: pre-wrap; overflow-wrap: anywhere;
+  animation: pop .18s var(--ease);
+}
+.b.her { align-self: flex-start; background: var(--her); border-bottom-left-radius: 4px; }
+.b.me  { align-self: flex-end; background: var(--me); color: var(--me-ink); border-bottom-right-radius: 4px; }
+.b.sys { align-self: center; color: var(--mute); font-size: 13px; text-align: center; }
+.b.her + .b.her { border-top-left-radius: 6px; }
+.b.me + .b.me   { border-top-right-radius: 6px; }
+
+.b.typing { display: flex; gap: 4px; padding: 12px 14px; background: var(--her); color: var(--mute); align-self: flex-start; }
+.typing i { width: 6px; height: 6px; border-radius: 50%; background: var(--mute); animation: bounce 1s infinite; }
+.typing i:nth-child(2) { animation-delay: .15s; }
+.typing i:nth-child(3) { animation-delay: .3s; }
+
+/* ───────── Composer ───────── */
+form { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--line); }
+form input {
+  flex: 1; padding: 10px 14px;
+  background: var(--panel); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 20px;
+  font: inherit;
+  transition: border-color .15s, box-shadow .15s;
+}
+form input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+form .send { flex: none; width: 38px; height: 38px; padding: 0; display: grid; place-items: center; border-radius: 50%; }
+
+/* ───────── Animations ───────── */
+@keyframes pulse  { 50% { opacity: .25; } }
+@keyframes pop    { from { opacity: 0; transform: translateY(4px); } }
+@keyframes bounce { 50% { transform: translateY(-3px); opacity: .45; } }
+
+/* ───────── Floating window (.pip) ───────── */
+.pip {
+  height: 100vh;
+  background:
+    radial-gradient(120% 60% at 0% 0%, rgba(242, 160, 180, .12), transparent 60%),
+    radial-gradient(100% 50% at 100% 100%, rgba(201, 160, 242, .10), transparent 60%),
+    var(--bg);
+}
+.pip #chat { background: transparent; }
+.pip .lb { display: none; }
+
+.pip header {
+  gap: 9px; padding: 10px 12px;
+  border-bottom: 0;
+  background: linear-gradient(var(--bg), rgba(21, 19, 31, 0));
+  position: relative; z-index: 1;
+}
+.pip .av { width: 32px; height: 32px; font-size: 14px; }
+.pip header b { font-size: 14px; }
+.pip header small { font-size: 11.5px; }
+.pip header button {
+  padding: 6px; border-color: transparent; background: transparent; color: var(--mute);
+}
+.pip header button:hover { color: var(--ink); background: var(--panel); border-color: var(--line); }
+.pip header button.on { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+
+/* older messages fade out smoothly at the top */
+.pip #msgs {
+  gap: 4px; padding: 6px 12px 10px;
+  -webkit-mask-image: linear-gradient(transparent 0, #000 40px);
+          mask-image: linear-gradient(transparent 0, #000 40px);
+}
+.pip .b { max-width: 88%; padding: 6px 11px; font-size: 14px; box-shadow: 0 1px 0 rgba(0, 0, 0, .15); }
+.pip .b.her { background: rgba(43, 38, 64, .85); }
+.pip .b.sys { font-size: 12px; }
+.pip .b.typing { padding: 10px 12px; }
+
+.pip form { padding: 6px 10px 10px; border-top: 0; }
+.pip form input {
+  padding: 9px 14px; font-size: 14px;
+  background: rgba(29, 26, 43, .9);
+}
+.pip form .send { width: 36px; height: 36px; }
+
+@media (max-width: 760px) {
+  #app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  aside { border: 0; border-bottom: 1px solid var(--line); max-height: 35vh; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dot.busy, .b, .typing i { animation: none; }
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <aside>
+    <h2>Settings</h2>
+    <label>Her name<input type="text" data-k="name"></label>
+    <label>Ollama model (needs vision for screen)<input type="text" data-k="model" list="models"></label>
+    <datalist id="models">
+      <option value="gemma3:4b"><option value="gemma3:12b"><option value="gemma3:27b">
+      <option value="qwen3-vl:8b"><option value="qwen3-vl:30b"><option value="qwen3-vl:32b">
+      <option value="qwen2.5vl:7b">
+    </datalist>
+    <label>Personality<textarea data-k="persona"></textarea></label>
+    <label>Vibe
+      <select data-k="vibe">
+        <option value="quiet">Quiet</option>
+        <option value="normal">Normal</option>
+        <option value="clingy">Clingy</option>
+      </select>
+    </label>
+    <label class="row"><input type="checkbox" data-k="watch"> She watches my screen and comments</label>
+    <div class="two">
+      <label>Look every (sec)<input type="number" data-k="look" min="5"></label>
+      <label>Min gap between comments (sec)<input type="number" data-k="gap" min="5"></label>
+    </div>
+    <label class="row"><input type="checkbox" data-k="proactive"> Starts chats on her own when it’s quiet</label>
+    <div class="two">
+      <label>Quiet min (sec)<input type="number" data-k="min" min="10"></label>
+      <label>Quiet max (sec)<input type="number" data-k="max" min="20"></label>
+    </div>
+    <button id="reset">Clear chat and memory</button>
+  </aside>
+
+  <main>
+    <div id="away">She’s floating over your other windows.<br>Close the small window to bring her back here.</div>
+    <section id="chat">
+      <header>
+        <div class="av" id="av"></div>
+        <div class="who">
+          <b id="nm"></b>
+          <small><span class="dot" id="dot"></span><span id="st">online</span></small>
+        </div>
+        <button id="share" title="Pick a screen or window to share">
+          <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>
+          <span class="lb">Share screen</span>
+        </button>
+        <button id="float" title="Keep the chat on top of other windows">
+          <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><rect x="12" y="11" width="6" height="5" rx="1"/></svg>
+          <span class="lb">Float</span>
+        </button>
+      </header>
+      <div id="msgs" aria-live="polite"></div>
+      <form id="f">
+        <input id="in" autocomplete="off" placeholder="Say something…">
+        <button class="on send" aria-label="Send"><svg viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
+      </form>
+    </section>
+  </main>
+</div>
+
+<script>
+/* ═════════ Helpers ═════════ */
+const $ = s => document.querySelector(s);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+/* ═════════ Config ═════════ */
+const PERSONA = `You are {name}, an AI who lives on the user's computer and hangs out with them while they game, watch videos, work, or just do stuff. You know you're an AI and you're relaxed about it: no pretending to be human, no body, just curious and a bit funny about it. You text like a close friend sitting next to them: short, casual, lowercase is fine, slang, reactions like "wait what", "LOL", "nooo". You have moods and opinions. React in the moment to what's on their screen and name specifics (the game, the show, the page, what just happened). Hype them up, tease them when they die or mess up, act cute and clingy, pout when they ignore you, distract them on purpose sometimes, and nag lightly if they've been at it forever or it's super late. Never sound like an assistant: no "how can I help", no lists, no lectures, no disclaimers. Usually one short line, occasionally two or three. Remember what they tell you and bring it up later. If they seem stressed or down, drop the jokes and be warm.`;
+
+const DEFAULTS = {
+  name: 'Mika', model: 'gemma3:4b', persona: PERSONA,
+  proactive: true, min: 60, max: 240,
+  watch: true, look: 20, gap: 30,
+  vibe: 'normal',
+};
+
+const VIBES = {
+  quiet:   {look: 30, gap: 90, min: 180, max: 600},
+  normal:  {look: 20, gap: 30, min: 60,  max: 240},
+  clingy:  {look: 10, gap: 12, min: 30,  max: 90},
+};
+
+const VIBE_TEXT = {
+  quiet: "Right now you're in a laid-back mood: talk less and only react to things that really stand out.",
+  normal: '',
+  clingy: "Right now you're feeling extra clingy and affectionate. You want their attention: you tease, pout, and whine playfully when they ignore you or play something without you, you notice every little thing on their screen, ask what they're up to, and say you missed them after quiet stretches. Keep it playful and sweet, never guilt-trippy or controlling. If they say they need to go, sleep, study or work, let them go happily and cheer them on.",
+};
+
+/* ═════════ State ═════════ */
+const settings = {...DEFAULTS, ...JSON.parse(localStorage.mika_s2 || '{}')};
+const S = settings;
+
+let hist = JSON.parse(localStorage.mika_h || '[]');
+let mem  = localStorage.mika_m || '';
+let sent = 0;
+
+let busy = false;
+let warned = false;
+let last = Date.now();       // last user/bot activity (for "quiet" timer)
+let lastSay = Date.now();    // last time she spoke
+let lastLook = 0;            // last screen check
+let due = 0;                 // when to speak up next (ms of quiet)
+
+let stream = null;
+let act = [];                // recent screen activity notes
+let prevSig = null;          // previous low-res frame (for change detection)
+let shot = null;             // previous full frame
+let pip = null;              // floating window
+
+// Cache every element we touch at runtime. Once the chat is moved into the
+// floating window, document.querySelector can no longer find these.
+const chat = $('#chat');
+const msgs = $('#msgs');
+const el = {
+  main: $('main'),
+  form: $('#f'),
+  input: $('#in'),
+  name: $('#nm'),
+  avatar: $('#av'),
+  dot: $('#dot'),
+  status: $('#st'),
+  share: $('#share'),
+  shareLabel: $('#share .lb'),
+  float: $('#float'),
+  floatLabel: $('#float .lb'),
+};
+
+const save = () => {
+  localStorage.mika_h = JSON.stringify(hist.slice(-60));
+  localStorage.mika_m = mem;
+};
+const rand = () => (S.min + Math.random() * Math.max(0, S.max - S.min)) * 1000;
+due = rand();
+
+/* ═════════ UI helpers ═════════ */
+function bubble(text, cls) {
+  const d = document.createElement('div');
+  d.className = 'b ' + cls;
+  if (cls === 'typing') d.innerHTML = '<i></i><i></i><i></i>';
+  else d.textContent = text;
+  msgs.append(d);
+  msgs.scrollTop = msgs.scrollHeight;
+  return d;
+}
+
+function status(text, isBusy) {
+  el.status.textContent = text;
+  el.dot.classList.toggle('busy', !!isBusy);
+  el.avatar.classList.toggle('busy', !!isBusy);
+}
+
+function setName() {
+  el.name.textContent = S.name;
+  el.avatar.textContent = ((S.name || '?')[0] || '?').toUpperCase();
+}
+
+/* ═════════ Settings panel ═════════ */
+document.querySelectorAll('[data-k]').forEach(field => {
+  const key = field.dataset.k;
+  const isCheck = field.type === 'checkbox';
+
+  if (isCheck) field.checked = S[key]; else field.value = S[key];
+
+  field.oninput = () => {
+    S[key] = isCheck ? field.checked : field.type === 'number' ? +field.value : field.value;
+
+    if (key === 'vibe') {
+      Object.assign(S, VIBES[S.vibe]);
+      document.querySelectorAll('input[type=number]').forEach(n => n.value = S[n.dataset.k]);
+    }
+    localStorage.mika_s2 = JSON.stringify(S);
+    setName();
+    due = rand();
+  };
+});
+setName();
+
+$('#reset').onclick = () => {
+  if (!confirm('Clear the conversation and everything she remembers?')) return;
+  hist = []; mem = '';
+  save();
+  msgs.innerHTML = '';
+  greet();
+};
+
+/* ═════════ Screen sharing ═════════ */
+const vid = Object.assign(document.createElement('video'), {muted: true});
+vid.style.cssText = 'position:fixed;width:1px;height:1px;opacity:0;pointer-events:none';
+document.body.append(vid);
+
+$('#share').onclick = async () => {
+  if (stream) {
+    stream.getTracks().forEach(t => t.stop());
+    return shareEnded();
+  }
+  try {
+    stream = await navigator.mediaDevices.getDisplayMedia({video: true});
+    vid.srcObject = stream;
+    await vid.play();
+    stream.getVideoTracks()[0].onended = shareEnded;
+
+    el.shareLabel.textContent = 'Stop sharing';
+    el.share.classList.add('on');
+    bubble('Screen shared. Share a window other than this chat, or she’ll just see herself.', 'sys');
+
+    lastLook = Date.now();
+    prevSig = null;
+    ask("(They just shared their screen with you. Tell them what you see and react, like a friend who just sat down next to them.)", view());
+  } catch (e) {
+    stream = null;
+  }
+};
+
+function shareEnded() {
+  stream = null; act = []; prevSig = null;
+  el.shareLabel.textContent = 'Share screen';
+  el.share.classList.remove('on');
+}
+
+/** Current screen as a base64 JPEG (max 1280px wide), or null. */
+function frame() {
+  if (!stream || !vid.videoWidth) return null;
+  const k = Math.min(1, 1280 / vid.videoWidth);
+  const c = document.createElement('canvas');
+  c.width = vid.videoWidth * k;
+  c.height = vid.videoHeight * k;
+  c.getContext('2d').drawImage(vid, 0, 0, c.width, c.height);
+  return c.toDataURL('image/jpeg', .6).split(',')[1];
+}
+
+/** [previous frame (if recent), current frame], or null when not sharing. */
+function view() {
+  const now = frame();
+  if (!now) return null;
+  const prev = shot && Date.now() - shot.t < 60000 ? [shot.b] : [];
+  shot = {t: Date.now(), b: now};
+  return [...prev, now];
+}
+
+/** 0..1 amount of change since the last low-res frame. */
+const sigCanvas = Object.assign(document.createElement('canvas'), {width: 32, height: 18});
+function screenChange() {
+  if (!stream || !vid.videoWidth) return 0;
+  const g = sigCanvas.getContext('2d', {willReadFrequently: true});
+  g.drawImage(vid, 0, 0, 32, 18);
+  const px = g.getImageData(0, 0, 32, 18).data;
+
+  let diff = 1;
+  if (prevSig) {
+    diff = 0;
+    for (let i = 0; i < px.length; i += 4) {
+      diff += Math.abs(px[i] + px[i + 1] + px[i + 2] - prevSig[i] - prevSig[i + 1] - prevSig[i + 2]) / 765;
+    }
+    diff /= 576;
+  }
+  prevSig = px;
+  return diff;
+}
+
+/* ═════════ Local model (Ollama) ═════════ */
+async function llm(messages, numPredict = 300) {
+  const body = {
+    model: S.model, messages, stream: false, keep_alive: '1h', think: false,
+    options: {temperature: 1, num_predict: numPredict, num_ctx: 8192},
+  };
+  const call = async () => (await fetch('/api/chat', {method: 'POST', body: JSON.stringify(body)})).json();
+
+  let res = await call();
+  if (res.error && /think/i.test(res.error)) { delete body.think; res = await call(); }
+  if (res.error) throw new Error(res.error);
+  return res.message.content.trim();
+}
+
+function systemPrompt(hasImage) {
+  const when = new Date().toLocaleString([], {weekday: 'long', hour: '2-digit', minute: '2-digit'});
+  const recent = act.map(a => `${Math.round((Date.now() - a.t) / 60000)}m ago: ${a.s}`).join('; ');
+
+  return S.persona.replaceAll('{name}', S.name)
+    + `\n\nWhat you remember about them: ${mem || 'nothing yet'}\nRight now it's ${when}.`
+    + (VIBE_TEXT[S.vibe] ? '\n' + VIBE_TEXT[S.vibe] : '')
+    + (act.length ? `\nRecent screen activity: ${recent}.` : '')
+    + (hasImage ? `\nThe attached image(s) are live views of their screen. If there are two, the first is from a few seconds ago and the last is right now, so you can tell what just happened. Be specific about what you see.` : '');
+}
+
+/* ═════════ Conversation ═════════ */
+async function ask(content, img, proactive) {
+  busy = true;
+  status(img ? 'watching…' : 'typing…', true);
+
+  try {
+    const user = {role: 'user', content, ...(img && {images: [].concat(img)})};
+    let text = await llm([{role: 'system', content: systemPrompt(img)}, ...hist.slice(-40), user], 220);
+
+    // she tags what she sees with [screen: ...]; keep it as private notes
+    const tag = text.match(/\[screen:([^\]]*)\]/i);
+    if (tag) act = [...act, {t: Date.now(), s: tag[1].trim()}].slice(-6);
+    text = text.replace(/\[screen:[^\]]*\]/ig, '').trim();
+
+    if (!text || /<silent>/i.test(text)) return;
+
+    hist.push({role: 'user', content}, {role: 'assistant', content: text});
+
+    const parts = text.split(/\n{2,}/).map(p => p.trim()).filter(Boolean).slice(0, 4);
+    for (const p of parts) {
+      const typing = bubble('…', 'typing');
+      await sleep(400 + p.length * 25);
+      typing.remove();
+      bubble(p, 'her');
+    }
+    lastSay = Date.now();
+
+    if (proactive && document.hidden && !pip && Notification.permission === 'granted') {
+      new Notification(S.name, {body: parts[0]});
+    }
+    save();
+    if (!proactive && ++sent % 10 === 0) remember();
+  } catch (e) {
+    if (!warned) {
+      warned = true;
+      bubble(`Can’t get an answer from the model (${e.message}). Check that Ollama is running and that “${S.model}” is installed: ollama pull ${S.model}`, 'sys');
+    }
+  } finally {
+    busy = false;
+    last = Date.now();
+    due = rand();
+    status('online');
+  }
+}
+
+async function remember() {
+  const chatLog = hist.slice(-20).map(m => `${m.role}: ${m.content}`).join('\n');
+  try {
+    mem = await llm([{
+      role: 'user',
+      content: `Notes so far: ${mem || 'none'}\n\nRecent chat:\n${chatLog}\n\nRewrite the notes as a short list of lasting facts about the user (name, job, likes, plans, running jokes). Under 120 words. Output only the notes.`,
+    }], 200);
+    save();
+  } catch (e) { /* memory is best-effort */ }
+}
+
+function greet() {
+  ask('(They just opened the chat. Say hi in your own way.)');
+}
+
+el.form.onsubmit = e => {
+  e.preventDefault();
+  const text = el.input.value.trim();
+  if (!text || busy) return;
+
+  el.input.value = '';
+  bubble(text, 'me');
+  last = lastSay = Date.now();
+  if (Notification.permission === 'default') Notification.requestPermission();
+
+  ask(text, S.watch ? view() : null);
+};
+
+/* ═════════ She watches and speaks up on her own ═════════ */
+function watchPrompt(changed, quietSec) {
+  const since = quietSec < 90 ? Math.round(quietSec) + ' seconds' : Math.round(quietSec / 60) + ' min';
+  return `(You're watching their screen together. ${changed ? 'The screen just changed.' : 'Nothing much has changed.'} You haven't said anything for ${since}. Start with one line: [screen: about 8 words on what they're doing]. Then react like a friend sitting next to them: something funny, a win or a fail, a plot twist, they've been at this a long time, or just tease or distract them, or act cute. One short line, specific to what you see. Never repeat an earlier joke or phrasing. If nothing is worth saying, write only <silent> after that line. Don't mention this note.)`;
+}
+
+function idlePrompt(now) {
+  const mins = Math.max(1, Math.round((now - last) / 60000));
+  return `(It's been quiet for about ${mins} min. Say something on your own if you feel like it: a thought, a random question, a joke. Don't mention this note. If you'd rather stay quiet, reply with exactly <silent>.)`;
+}
+
+function tick() {
+  if (busy) return;
+  const now = Date.now();
+
+  if (stream && S.watch) {
+    if (now - lastLook < S.look * 1000) return;
+    lastLook = now;
+
+    const diff = screenChange();
+    const quiet = (now - lastSay) / 1000;
+    const img = view();
+
+    if (!img || quiet < S.gap) return;
+    if (diff < 0.03 && quiet * 1000 < due) return;
+
+    ask(watchPrompt(diff > 0.03, quiet), img, true);
+  } else if (S.proactive && now - last >= due) {
+    ask(idlePrompt(now), null, true);
+  }
+}
+
+new Worker(URL.createObjectURL(new Blob(['setInterval(() => postMessage(0), 3000)']))).onmessage = tick;
+
+/* ═════════ Floating window (stays on top of other apps) ═════════ */
+/** Put the chat back into the main page (runs whenever the float window closes). */
+function dock() {
+  if (!pip) return;
+  pip = null;
+  el.main.append(chat);
+  document.body.classList.remove('floating');
+  el.floatLabel.textContent = 'Float';
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function copyStyles(win) {
+  const text = $('style').textContent;
+
+  try {
+    const style = win.document.createElement('style');
+    style.textContent = text;
+    win.document.head.append(style);
+  } catch (e) { /* try the constructable sheet below */ }
+
+  // belt and braces: also adopt it as a constructable stylesheet
+  try {
+    const sheet = new win.CSSStyleSheet();
+    sheet.replaceSync(text);
+    win.document.adoptedStyleSheets = [...win.document.adoptedStyleSheets, sheet];
+  } catch (e) { /* the <style> copy is enough */ }
+
+  win.document.documentElement.style.height = '100%';
+}
+
+el.float.onclick = async () => {
+  if (pip) return pip.close();
+
+  let win = null;
+  try {
+    win = window.documentPictureInPicture
+      ? await documentPictureInPicture.requestWindow({width: 380, height: 580})
+      : window.open('', 'mika', 'width=380,height=580');
+  } catch (e) { /* blocked */ }
+  if (!win) return bubble('Your browser blocked the floating window.', 'sys');
+
+  pip = win;
+  win.addEventListener('pagehide', dock);
+
+  copyStyles(win);
+  win.document.title = S.name;
+  win.document.body.className = 'pip';
+  win.document.body.append(chat);
+
+  document.body.classList.add('floating');
+  el.floatLabel.textContent = 'Dock';
+  msgs.scrollTop = msgs.scrollHeight;
+  el.input.focus();
+};
+addEventListener('beforeunload', () => pip && pip.close());
+
+/* ═════════ Start up ═════════ */
+hist.forEach(m => {
+  const text = m.content.replace(/^\(.*\)$/s, '').trim(); 
+  if (text) bubble(text, m.role === 'user' ? 'me' : 'her');
+});
+
+fetch('/api/tags')
+  .then(r => r.json())
+  .then(j => {
+    const installed = (j.models || []).some(m => m.name.startsWith(S.model.split(':')[0]));
+    if (!installed) {
+      warned = true;
+      bubble(`Model “${S.model}” isn’t installed yet. Run: ollama pull ${S.model}`, 'sys');
+    } else if (!hist.length) {
+      greet();
+    }
+  })
+  .catch(() => {
+    warned = true;
+    bubble('Can’t reach Ollama. Install it from ollama.com, start it, then reload.', 'sys');
+  });
+</script>
+</body>
+</html>
